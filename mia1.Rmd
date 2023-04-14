@@ -6,7 +6,7 @@ output:
 date: "2023-04-13"
 ---
 
-```{r setup, include=FALSE}
+```{r setup}
 knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
 library(tidyverse)
 library(here)
@@ -14,20 +14,22 @@ library(ggthemes)
 theme_set(theme_bw())
 ```
 
-```{r, include=F, echo=F}
+```{r, echo=T}
 data_loc <- "data_1"
 
 sternberg <- list.files(path=here(data_loc), pattern=".*sternberg.*csv") |> 
   map_df(~read_csv(here(data_loc,.))) |> 
   filter(!is.na(response_type)) |> 
-  select(match_type, response_type, correct, rt, subject_id,trial_index)
+  select(match_type, response_type, correct, rt, subject_id,trial_index) |> 
+  mutate(rt=as.numeric(rt))
 
 
 nback <- list.files(path=here(data_loc), pattern=".*nback.*csv") |> 
   map_df(~read_csv(here(data_loc,.))) |> 
   filter(!is.na(response_type)) |> 
   filter(exclude_trial==F) |> 
-  select(phase, match_type, response_type, correct, rt, subject_id, trial_index)
+  select(phase, match_type, response_type, correct, rt, subject_id, trial_index) |> 
+  mutate(rt=as.numeric(rt))
 ```
 
 # Sternberg task
@@ -36,10 +38,10 @@ nback <- list.files(path=here(data_loc), pattern=".*nback.*csv") |>
 
 ```{r}
 
-sternberg |> group_by(subject_id, match_type) |> 
+sternberg |> group_by(subject_id) |> 
   mutate(is.correct=as.numeric(correct)) |> 
   summarize(mean_correct=mean(is.correct)) |> 
-  ggplot(aes(x=match_type, y=mean_correct))+geom_jitter(width=.2, height=0)+
+  ggplot(aes(x="Sternberg task", y=mean_correct))+geom_jitter(width=.2, height=0)+
   stat_summary(fun.data = "mean_cl_boot", color="red")+
   labs(y="Percent correct", x="")
 
@@ -50,24 +52,16 @@ sternberg |> group_by(subject_id, match_type) |>
 
 ```{r}
 
-sternberg |> group_by(subject_id, match_type) |> 
-  summarize(mean_rt=mean(as.numeric(rt))) |> 
+sternberg |> mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
+  ggplot(aes(x=rt, fill=correct))+
+  geom_histogram()+facet_wrap(.~correct)+scale_fill_solarized()+
+  theme(legend.position = "none")+
+  labs(x="Reaction Time")
 
-  ggplot(aes(x=match_type, y=mean_rt))+geom_jitter(width=.2, height=0)+
+sternberg |> mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
+  ggplot(aes(x=correct, y=rt))+geom_jitter(width=.2, height=0, alpha=.1)+
   stat_summary(fun.data = "mean_cl_boot", color="red")+
   labs(y="Response time in ms", x="")
-
-```
-
-## Speed Accuracy trade off
-
-```{r}
-
-sternberg |>
-  ggplot(aes(x=match_type, y=as.numeric(rt)))+
-  stat_summary(aes(color=correct),fun.data = "mean_cl_boot", position=position_dodge(.2))+
-  labs(y="Response time in ms", x="")+
-  scale_color_solarized()
 
 ```
 
@@ -75,31 +69,49 @@ sternberg |>
 
 ## Accuracy
 
-```{r}
 
-nback |> group_by(phase, match_type, subject_id) |> 
+```{r}
+# counts non response as false
+nback |> group_by(phase, subject_id) |> 
   mutate(is.correct=as.numeric(correct)) |> 
   summarize(mean_correct=mean(is.correct)) |> 
-  ggplot(aes(x=match_type, y=mean_correct))+geom_jitter(width=.2, height=0, alpha=.3)+
+  ggplot(aes(x=phase, y=mean_correct))+geom_jitter(width=.2, height=0, alpha=.3)+
   stat_summary(aes(color=phase),fun.data = "mean_cl_boot")+
-  facet_grid(.~phase)+
+  labs(y="Percent correct", x="")+
+  theme(legend.position = "none")
+
+# excluding non responses
+nback |> filter(response_type!="NO_RESPONSE") |> 
+  group_by(phase, subject_id) |> 
+  mutate(is.correct=as.numeric(correct)) |> 
+  summarize(mean_correct=mean(is.correct)) |> 
+  ggplot(aes(x=phase, y=mean_correct))+geom_jitter(width=.2, height=0, alpha=.3)+
+  stat_summary(aes(color=phase),fun.data = "mean_cl_boot")+
   labs(y="Percent correct", x="")+
   theme(legend.position = "none")
 ```
 
-## Speed of correct answers
+## Speed
 
 ```{r}
 
-nback |> group_by(phase,subject_id, match_type) |> 
-  filter(correct==T) |> 
-  summarize(mean_rt=mean(as.numeric(rt))) |> 
+nback |> filter(response_type!="NO_RESPONSE") |> 
+mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
+  ggplot(aes(x=rt, fill=phase))+
+  geom_histogram()+facet_grid(.~phase)+scale_fill_solarized()+
+  theme(legend.position = "none")+
+  labs(x="Reaction Time")
 
-  ggplot(aes(x=match_type, y=mean_rt))+geom_jitter(width=.2, height=0)+
-  stat_summary(aes(color=phase),fun.data = "mean_cl_boot")+
-  facet_grid(.~phase)+
-  labs(y="Reaction time in ms", x="")+
-  theme(legend.position = "none")
+
+
+
+nback|> mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
+  ggplot(aes(x=correct, y=rt, color=phase))+geom_jitter(width=.2, height=0, alpha=.01, color="black")+
+  stat_summary(fun.data = "mean_cl_boot")+ facet_grid(.~phase)+
+  labs(y="Response time in ms", x="")+theme(legend.position = "none")
+
+```
+
 ```
 
 ```

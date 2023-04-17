@@ -140,8 +140,9 @@ Again, we can see log-normal distributions of reaction times.
 
 
 nback|> mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
-  ggplot(aes(x=correct, y=rt, color=phase))+geom_jitter(width=.2, height=0, alpha=.007, color="black")+
+  ggplot(aes(x=correct, y=rt, color=phase))+#geom_jitter(width=.2, height=0, alpha=.007, color="black")+
   stat_summary(fun.data = "mean_cl_boot", size=.5)+ facet_grid(.~phase)+
+  coord_cartesian(ylim=c(800,1200))+
   labs(y="Response time in ms", x="")+theme(legend.position = "none")
 
 ggsave(here(images,"nback_rt2.png"), dev="png")

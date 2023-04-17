@@ -6,21 +6,24 @@ output:
 date: "2023-04-13"
 ---
 
-```{r setup}
+```{r setup, echo=F}
 knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
 library(tidyverse)
 library(here)
 library(ggthemes)
 theme_set(theme_bw())
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
 ```
 
 ```{r, echo=T}
 data_loc <- "data_1"
+images <- "images_1"
 
 sternberg <- list.files(path=here(data_loc), pattern=".*sternberg.*csv") |> 
   map_df(~read_csv(here(data_loc,.))) |> 
   filter(!is.na(response_type)) |> 
   select(match_type, response_type, correct, rt, subject_id,trial_index) |> 
+  unique() |> 
   mutate(rt=as.numeric(rt))
 
 
@@ -29,26 +32,32 @@ nback <- list.files(path=here(data_loc), pattern=".*nback.*csv") |>
   filter(!is.na(response_type)) |> 
   filter(exclude_trial==F) |> 
   select(phase, match_type, response_type, correct, rt, subject_id, trial_index) |> 
+  unique() |> 
   mutate(rt=as.numeric(rt))
 ```
 
 # Sternberg task
 
+This analysis is based on responses from `r sternberg |> select(subject_id) |> unique() |> nrow()` students. 
+
 ## Accuracy
+
+Overall, the accuracy on the sternberg task was very high!
 
 ```{r}
 
 sternberg |> group_by(subject_id) |> 
   mutate(is.correct=as.numeric(correct)) |> 
   summarize(mean_correct=mean(is.correct)) |> 
-  ggplot(aes(x="Sternberg task", y=mean_correct))+geom_jitter(width=.2, height=0)+
+  ggplot(aes(x="Sternberg task", y=mean_correct))+geom_jitter(width=.2, height=0.05, alpha=.1)+
   stat_summary(fun.data = "mean_cl_boot", color="red")+
   labs(y="Percent correct", x="")
 
-
+ggsave(here(images,"sternberg_acc.png"))
 ```
 
 ## Speed
+
 
 ```{r}
 
@@ -58,38 +67,59 @@ sternberg |> mutate(correct=ifelse(correct,"correct", "incorrect")) |>
   theme(legend.position = "none")+
   labs(x="Reaction Time")
 
+
+ggsave(here(images,"sternberg_rts.png"), dev="png")
+```
+
+
+```{r}
 sternberg |> mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
-  ggplot(aes(x=correct, y=rt))+geom_jitter(width=.2, height=0, alpha=.1)+
-  stat_summary(fun.data = "mean_cl_boot", color="red")+
+  ggplot(aes(x=correct, y=rt))+geom_jitter(width=.2, height=0, alpha=.02)+
+  stat_summary(fun.data = "mean_cl_boot", color="red", size=1)+
   labs(y="Response time in ms", x="")
 
 ```
 
+The average reaction time was roughly 1 second for both correct and incorrect answers. As is common with reaction time data, the distribution of times is roughly log-normal. 
+
 # N-back
+
+This analysis is based on responses from `r nback |> select(subject_id) |> unique() |> nrow()` students. 
+
 
 ## Accuracy
 
+There were a number of non-responses, potentially due to not understanding the task. If we treat non-responses as false, this is what accuracy looks like.
 
 ```{r}
 # counts non response as false
 nback |> group_by(phase, subject_id) |> 
   mutate(is.correct=as.numeric(correct)) |> 
   summarize(mean_correct=mean(is.correct)) |> 
-  ggplot(aes(x=phase, y=mean_correct))+geom_jitter(width=.2, height=0, alpha=.3)+
-  stat_summary(aes(color=phase),fun.data = "mean_cl_boot")+
+  ggplot(aes(x=phase, y=mean_correct))+geom_jitter(width=.2, height=0.05, alpha=.1)+
+  stat_summary(aes(color=phase),fun.data = "mean_cl_boot", size=1)+
   labs(y="Percent correct", x="")+
   theme(legend.position = "none")
 
+```
+
+If we instead exclude the non-responses, the accuracy instead looks like this.
+
+```{r}
 # excluding non responses
 nback |> filter(response_type!="NO_RESPONSE") |> 
   group_by(phase, subject_id) |> 
   mutate(is.correct=as.numeric(correct)) |> 
   summarize(mean_correct=mean(is.correct)) |> 
-  ggplot(aes(x=phase, y=mean_correct))+geom_jitter(width=.2, height=0, alpha=.3)+
-  stat_summary(aes(color=phase),fun.data = "mean_cl_boot")+
+  ggplot(aes(x=phase, y=mean_correct))+geom_jitter(width=.2, height=0, alpha=.1)+
+  stat_summary(aes(color=phase),fun.data = "mean_cl_boot", size=1)+
   labs(y="Percent correct", x="")+
   theme(legend.position = "none")
+
+ggsave(here(images,"nback_acc.png"), dev="png")
+
 ```
+In either case, we can see that accuracy slowly declines as the N increases. 
 
 ## Speed
 
@@ -102,16 +132,20 @@ mutate(correct=ifelse(correct,"correct", "incorrect")) |>
   theme(legend.position = "none")+
   labs(x="Reaction Time")
 
+ggsave(here(images,"nback_rt.png"), dev="png")
+```
+Again, we can see log-normal distributions of reaction times. 
 
+```{r}
 
 
 nback|> mutate(correct=ifelse(correct,"correct", "incorrect")) |> 
-  ggplot(aes(x=correct, y=rt, color=phase))+geom_jitter(width=.2, height=0, alpha=.01, color="black")+
-  stat_summary(fun.data = "mean_cl_boot")+ facet_grid(.~phase)+
+  ggplot(aes(x=correct, y=rt, color=phase))+geom_jitter(width=.2, height=0, alpha=.007, color="black")+
+  stat_summary(fun.data = "mean_cl_boot", size=.5)+ facet_grid(.~phase)+
   labs(y="Response time in ms", x="")+theme(legend.position = "none")
 
-```
+ggsave(here(images,"nback_rt2.png"), dev="png")
 
 ```
 
-```
+The speed of 1-back is noticeable faster than that of 2,3, or 4 back, but there isn't much difference in speed between 2, 3, or 4 back. Incorrect and correct answers are about the same speed.

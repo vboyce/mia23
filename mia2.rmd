@@ -1,0 +1,84 @@
+---
+title: "Memory in Action 2: Stroop task"
+output: 
+  html_document:
+    toc: true
+date: "2023-04-13"
+---
+
+```{r setup, echo=F}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
+library(tidyverse)
+library(here)
+library(ggthemes)
+theme_set(theme_bw())
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
+
+images <- "images_2"
+```
+
+```{r}
+library(googledrive)
+
+
+f <- googledrive::as_dribble("https://docs.google.com/spreadsheets/d/1muyH0Dw2tNPK5iQ3NyiwOAz7ISWi7KoKQd6uhQnf24Q/edit#gid=262186472")
+googledrive::drive_download(f, path=here("data_2","stroop.xlsx"), overwrite=T)
+
+
+stroop <- readxl::read_xlsx(here("data_2","stroop.xlsx"), 
+                       sheet="Form Responses 1", skip=0) |> rename(easy_task=`Task 1: Copy & paste the amount of time (secs) elapsed it took you to complete "The easy practice test"`,
+                                                                   hard_task=`Task 2: Copy & paste the amount of time (secs) elapsed it took you to complete "The real hard test"`) |> 
+  filter(easy_task<200) |> 
+  filter(hard_task<200)
+
+
+```
+
+These visualizations are based on `r nrow(stroop)` submissions. 
+
+```{r}
+
+stroop_long <- stroop |> pivot_longer(easy_task:hard_task) 
+
+ggplot(stroop_long, aes(x=value, fill=name))+
+  geom_histogram()+facet_grid(name~.)+
+  scale_fill_solarized()+theme(legend.position="none")+labs(x="Time to complete task in seconds")
+
+ggsave(here(images, "histogram.png"), dev="png")
+
+```
+
+The harder task takes longer than the easier task in general, although there is some overlap between the distributions. 
+
+```{r}
+
+ggplot(stroop_long, aes(x=name, y=value, color=name))+
+  geom_jitter(alpha=.1, color="black", width=.1, height=0)+
+  stat_summary(fun.data = "mean_cl_boot", size=.6)+
+  labs(x="", y="seconds")+
+  scale_color_solarized()+
+  theme(legend.position="none")
+
+ggsave(here(images,"dots.png"), dev="png")
+```
+
+On average, the easy task takes half as long as the hard task. 
+
+```{r}
+
+ggplot(stroop, aes(x=easy_task, y=hard_task))+geom_point(alpha=.5)+
+  geom_smooth(method="lm")+geom_abline(slope=1, intercept=0)+
+  coord_equal(xlim=c(0,70), ylim=c(0,70))+
+  labs(x="Time to complete easy task (sec)", y="TIme to complete hard task (sec)")
+
+ggsave(here(images,"scatter.png"), dev="png")
+```
+
+Everyone is taking longer on the hard task than the easy task. Times are correlated, so some people are faster to respond overall than others. 
+
+```{r}
+
+ggplot(stroop, aes(x=hard_task-easy_task))+labs(x="Difference in time to complete tasks")+geom_density()+geom_point(y=0, alpha=.5)
+
+ggsave(here(images, "diff.png"), dev="png")
+```

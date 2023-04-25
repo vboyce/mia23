@@ -1,0 +1,57 @@
+---
+title: "Memory in Action 3: Semantic memory"
+output: 
+  html_document:
+    toc: true
+date: "2023-04-13"
+---
+
+```{r setup, echo=F}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
+library(tidyverse)
+library(here)
+library(ggthemes)
+theme_set(theme_bw())
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
+
+images <- "images_3"
+```
+
+```{r}
+library(googledrive)
+
+
+f <- googledrive::as_dribble("https://docs.google.com/spreadsheets/d/1mcsrBWIXBK5yMrgpuCxQLoFbLnW8L-Qi9DFkI6bmdgE/edit#gid=332008038")
+googledrive::drive_download(f, path=here("data_3","semantic.xlsx"), overwrite=T)
+
+
+semantic <- readxl::read_xlsx(here("data_3","semantic.xlsx"), 
+                       sheet="Form Responses 1", skip=0) 
+
+```
+
+These visualizations are based on `r nrow(semantic)` submissions. 
+
+```{r}
+
+dat <- semantic |> select(-Timestamp, -`Email Address`, -Name, -`SUNet ID`) |> 
+  pivot_longer(everything()) |> separate(name, c("type", "instance")) 
+
+
+
+ggplot(dat, aes(x=reorder(instance, value), y=value, color=type))+
+  geom_jitter(, height=.1, width=.2, alpha=.1)+
+  stat_summary(fun.data = "mean_cl_boot", color="black")+
+  facet_wrap(~type, scales="free_x")+
+  theme(legend.position = "none")+
+  labs(y="Goodness as example of class", x="")
+
+         
+    
+
+ggsave(here(images, "dist.png"), dev="png")
+
+```
+There looks to be a correlation between the average ratings and the spread of the ratings. The prototypical examples like apple get almost uniformly rated as a 1 ("good example of the class") whereas less prototypical examples have less agreement -- some people think wresting is a good example of a sport, but others don't. 
+
+Might be something to do with how people are using the scales? Like, maybe some people are thinking "well, an ostrich isn't that great of a bird, but at least it's still a bird" and would only use 6 or 7 on the scale for say lizard (it's such a bad example of a bird, it's not even a bird). I'm surprised by the ostrich / wren ordering. 

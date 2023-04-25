@@ -17,7 +17,7 @@ knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
 images <- "images_3"
 ```
 
-```{r}
+```{r, echo=F}
 library(googledrive)
 
 

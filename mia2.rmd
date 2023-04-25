@@ -17,13 +17,15 @@ knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
 images <- "images_2"
 ```
 
-```{r}
+```{r, echo=F}
 library(googledrive)
 
 
 f <- googledrive::as_dribble("https://docs.google.com/spreadsheets/d/1muyH0Dw2tNPK5iQ3NyiwOAz7ISWi7KoKQd6uhQnf24Q/edit#gid=262186472")
 googledrive::drive_download(f, path=here("data_2","stroop.xlsx"), overwrite=T)
+```
 
+```{r}
 
 stroop <- readxl::read_xlsx(here("data_2","stroop.xlsx"), 
                        sheet="Form Responses 1", skip=0) |> rename(easy_task=`Task 1: Copy & paste the amount of time (secs) elapsed it took you to complete "The easy practice test"`,

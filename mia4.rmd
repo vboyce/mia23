@@ -1,0 +1,177 @@
+---
+title: "Memory in Action 4: Emotion and memory"
+output: 
+  html_document:
+    toc: true
+date: "2023-04-13"
+---
+
+```{r setup, echo=F}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
+library(tidyverse)
+library(here)
+library(ggthemes)
+theme_set(theme_bw())
+knitr::opts_chunk$set(dev = "png", dev.args = list(type = "cairo-png"))
+
+images <- "images_4"
+```
+
+```{r, echo=F}
+library(googledrive)
+
+
+f <- googledrive::as_dribble("https://docs.google.com/spreadsheets/d/1wqjR2YQGRAsnnxi3dz0Y05U9TvGJQE_2HdlB8ojkopE/edit#gid=1285960009")
+googledrive::drive_download(f, path=here("data_4","emotion.xlsx"), overwrite=T)
+
+
+dt <- readxl::read_xlsx(here("data_4","emotion.xlsx"), 
+                       sheet="Form Responses 1", skip=0) 
+
+names(dt) <- c("Timestamp", "email", "Name", "ID" ,"Words", "Responses")
+
+```
+
+These visualizations are based on `r nrow(dt)` submissions. 
+
+Process data
+
+```{r}
+dt = dt%>%
+  filter(Name != "Test" ) %>%
+  distinct(Name, .keep_all=TRUE)
+
+longify = function(data){
+  
+  Words  = unlist(strsplit(gsub("\"|\\[|\\]| |\n", "", as.character(data$Words)), ","))
+  Responses = unlist(strsplit(gsub("\"|\\[|\\]| |\n", "", as.character(data$Responses)), ","))
+  
+  if(length(Words) == length(Responses)){
+    out = data.frame(word = Words, response = Responses)
+  }
+  
+  else {
+    Warning = paste("Warning: Longify failes for subject", unique(data$Name))
+    out = data.frame(word = Warning, response = NA)
+    }
+  
+   return(out)
+}
+
+dt_long = dt %>% 
+  group_by(Name) %>%
+  do(longify(.)) %>%
+  drop_na()
+
+list_info = read.csv(here("data_4",'valence_ratings.csv'))
+list_info$word = as.character(list_info$word)
+
+
+dt_long = dt_long %>%
+  left_join(list_info, by = "word") |> 
+  mutate(response=as.numeric(response)) |> 
+  filter(!is.na(valence)) # "hostage" and "mutilate" don't have ratings
+```
+
+# Valence
+
+How well are words remembered as a function of valence?
+
+```{r}
+dt_long %>%
+  group_by(valence) %>%
+  ggplot(aes(x = valence, y = response, color=valence))+
+  stat_summary(fun.data = "mean_cl_boot")+
+  theme_classic()+
+  scale_color_manual(values=c("negative"="red", "neutral"="blue","positive"="green"))+
+  theme(legend.position = "none")+
+  ylab("Proportion remembered")+
+  coord_cartesian(ylim=c(0,.5))
+
+ggsave(here(images, "valence.png"), dev="png")
+
+```
+More strongly valenced words (either positive or negative) are remembered better than neutral.
+
+
+Which words are remembered best?
+
+```{r}
+dt_long %>%
+  group_by(word) %>%
+  summarise(prop_remb = sum(as.numeric(response))/n()) %>%
+  arrange(-prop_remb)
+```
+
+# Order
+
+How does presentation order affect memory?
+
+```{r}
+dt_serial = dt_long %>%
+  group_by(Name) %>%
+  mutate(serial_position = 1:n()) %>%
+  mutate(serial_category = ifelse(serial_position <6, "primacy", ifelse(serial_position>40, "recency", "middle"))) %>%
+  mutate(serial_category = factor(serial_category,levels = c("primacy", "middle", "recency"))) %>%
+  ungroup()
+
+dt_serial %>%
+  group_by(serial_category) %>%
+  ggplot(aes(serial_category, response))+
+  stat_summary(fun.data = "mean_cl_boot")+
+  theme_classic()+
+    coord_cartesian(ylim=c(0,.6))
+
+```
+Words presented in the first or last 5 words are remembered better than the ones in the middle.
+
+This is also seen continuously. 
+
+```{r}
+dt_serial %>%
+  group_by(serial_position) %>%
+  ggplot(aes(serial_position, response))+
+    stat_summary(fun.data = "mean_cl_boot")+
+  theme_classic()+
+  geom_smooth()+
+  ylab("Proportion remembered")+
+      coord_cartesian(ylim=c(0,.7))
+
+ggsave(here(images, "time.png"), dev="png")
+
+```
+The earliest words are remembered best, declining over the first 10 or so words (primacy effect). Then in the middle memory is steady, but there's a recency effect on the last 5 or so words. 
+
+# Valence and Order
+
+```{r}
+
+dt_serial %>%
+  group_by(serial_category, valence) %>%
+  ggplot(aes(serial_category, response, group= valence, color=valence))+
+    stat_summary(fun.data = "mean_cl_boot", position=position_dodge(.2))+
+  scale_color_manual(values=c("red", "green", "blue"))+
+  theme_classic()+
+  ylab("Proportion remembered")+
+        coord_cartesian(ylim=c(0,.7))
+
+
+
+ggsave(here(images, "valence_time.png"), dev="png")
+
+```
+The primacy effect is strong regardless of valence. Recency effect is strongest for valenced words. In the middle section, emotionally valenced words are remembed much better than neutral words. 
+
+```{r}
+
+dt_serial %>%
+  group_by(serial_position, valence)%>%
+  ggplot(aes(serial_position, response, group= valence, col=valence))+
+  geom_smooth(alpha = 0.5)+
+      stat_summary(fun.data = "mean_cl_boot", position=position_dodge(.2), geom="point")+
+  scale_fill_manual(values=c("red", "green", "blue"))+
+  theme_classic()+
+        coord_cartesian(ylim=c(0,.8))+
+  ylab("Proportion remembered")
+
+```
